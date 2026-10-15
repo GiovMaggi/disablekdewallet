@@ -11,7 +11,7 @@ A script that completely disables KDE Wallet on any Linux distro running KDE Pla
 | Distro family | Examples | Removal command |
 |---|---|---|
 | Arch | Arch, Manjaro, EndeavourOS, CachyOS, Garuda | `pacman -Rns` |
-| Debian | Debian, Ubuntu, Kubuntu, KDE neon, Mint, Pop!_OS | `apt-get remove` |
+| Debian | Debian, Ubuntu, Kubuntu, KDE neon, Mint, Pop!_OS | `apt-get purge` |
 | Fedora | Fedora, Nobara | `dnf remove` |
 | Fedora Atomic | Kinoite, Bazzite | `rpm-ostree override remove` (needs a reboot) |
 | openSUSE | Tumbleweed, Leap, Kalpa | `zypper remove` / `transactional-update pkg remove` |
@@ -19,9 +19,19 @@ A script that completely disables KDE Wallet on any Linux distro running KDE Pla
 | NixOS | | Prints the `configuration.nix` option to set |
 | SteamOS | | Skipped (read-only system) |
 
+The real package removal has been tested in containers on Debian 13, Ubuntu 26.04, Fedora 44, openSUSE Tumbleweed, Void and Arch. The Fedora Atomic, transactional openSUSE, NixOS and SteamOS paths haven't been tested.
+
 On other distros the script still runs steps 1 and 2. Step 1 alone is enough to stop the wallet from opening.
 
 ## Usage
+
+Run it straight from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GiovMaggi/disablekdewallet/main/disablekdewallet.sh | bash
+```
+
+Or clone it first:
 
 ```bash
 git clone https://github.com/GiovMaggi/disablekdewallet.git

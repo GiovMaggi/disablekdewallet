@@ -107,9 +107,12 @@ stop_daemons() {
 
 # --- step 3: remove the PAM module ------------------------------------------
 
-find_pam_modules() {
-    find /usr/lib /usr/lib64 /lib /lib64 -maxdepth 3 -name 'pam_kwallet*.so' 2>/dev/null \
-        | xargs -r realpath | sort -u
+# The PAM module plus its login autostart entry (a separate package on Debian/Ubuntu)
+find_pam_files() {
+    {
+        find /usr/lib /usr/lib64 /lib /lib64 -maxdepth 3 -name 'pam_kwallet*.so' 2>/dev/null
+        ls /etc/xdg/autostart/pam_kwallet_init.desktop 2>/dev/null
+    } | xargs -r realpath | sort -u
 }
 
 # Prints the package(s) owning the given PAM module files
@@ -119,11 +122,11 @@ owning_packages() {
     for f in "$@"; do
         case $family in
             arch)   pacman -Qqo "$f" 2>/dev/null ;;
-            debian) dpkg -S "$(basename "$f")" 2>/dev/null | cut -d: -f1 ;;
+            debian) dpkg -S "$(basename "$f")" 2>/dev/null | cut -d: -f1 | tr ', ' '\n\n' ;;
             fedora|suse) rpm -qf --qf '%{NAME}\n' "$f" 2>/dev/null ;;
             void)   xbps-query -o "$f" 2>/dev/null | cut -d: -f1 | sed 's/-[^-]*$//' ;;
         esac
-    done | sort -u
+    done | grep -v '^$' | sort -u
 }
 
 remove_pam() {
@@ -142,12 +145,12 @@ remove_pam() {
     esac
 
     local modules
-    mapfile -t modules < <(find_pam_modules)
+    mapfile -t modules < <(find_pam_files)
     if (( ${#modules[@]} == 0 )); then
         info "No kwallet PAM module installed, nothing to remove"
         return
     fi
-    info "Found PAM module(s): ${modules[*]}"
+    info "Found: ${modules[*]}"
 
     if [[ $family == unknown ]]; then
         warn "Unsupported distro; remove the package that owns ${modules[*]} manually."
@@ -176,14 +179,22 @@ remove_pam() {
     else
         case $family in
             arch)   cmd=(sudo pacman -Rns "${pkgs[@]}") ;;
-            debian) cmd=(sudo apt-get remove "${pkgs[@]}") ;;
+            debian) cmd=(sudo apt-get purge "${pkgs[@]}") ;;
             fedora) cmd=(sudo dnf remove "${pkgs[@]}") ;;
             suse)   cmd=(sudo zypper remove "${pkgs[@]}") ;;
             void)   cmd=(sudo xbps-remove -R "${pkgs[@]}") ;;
         esac
     fi
 
-    if ! run "${cmd[@]}"; then
+    # When the script itself is piped in (curl ... | bash), stdin isn't the keyboard,
+    # so let the package manager ask for confirmation on the terminal instead.
+    local rc=0
+    if [[ ! -t 0 ]] && { : </dev/tty; } 2>/dev/null; then
+        run "${cmd[@]}" </dev/tty || rc=$?
+    else
+        run "${cmd[@]}" || rc=$?
+    fi
+    if (( rc )); then
         warn "Package removal failed or was cancelled. The wallet is still disabled (step 1)."
         return
     fi
